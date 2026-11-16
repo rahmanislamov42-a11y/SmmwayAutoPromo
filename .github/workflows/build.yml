@@ -26,12 +26,15 @@ jobs:
       - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.9'
 
       - name: Unpack project archive
         shell: bash
         run: |
-          archive="$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1 || true)"
+          set -euo pipefail
+
+          archive="$(find . -maxdepth 2 -type f -iname '*.zip' ! -path './.git/*' | head -n 1 || true)"
+
           if [ -n "$archive" ]; then
             mkdir -p extracted
             unzip -o "$archive" -d extracted
@@ -50,9 +53,11 @@ jobs:
           fi
 
           project_dir="$(dirname "$gradle_file")"
+
           echo "Project directory: $project_dir"
 
           cd "$project_dir"
+
           gradle --no-daemon assembleDebug
 
       - name: Upload APK
