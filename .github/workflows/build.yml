@@ -1,20 +1,19 @@
-
-name: Build SMMWAY Android APK
+name: Build Android APK
 
 on:
   workflow_dispatch:
-
-permissions:
-  contents: read
+  push:
+    branches: [ main, master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Java 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -23,22 +22,42 @@ jobs:
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Extract project
-        run: unzip -q SMMWAYAutoPromo_GitHubActions.zip -d project
-
-      - name: Install Gradle
+      - name: Unpack project archive (if present)
+        shell: bash
         run: |
-          curl -L https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
-          unzip -q /tmp/gradle.zip -d /tmp
-          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
+          set -e
+          archive="$(find . -maxdepth 2 -type f -iname '*.zip' ! -path './.git/*' | head -n 1 || true)"
+          if [ -n "$archive" ]; then
+            mkdir -p extracted
+            unzip -o "$archive" -d extracted
+          fi
 
-      - name: Build APK
-        run: gradle --no-daemon -p project :app:assembleDebug
+      - name: Find Android project and build APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle_file="$(find . -type f \( -name settings.gradle -o -name settings.gradle.kts \) ! -path './.git/*' | head -n 1)"
+
+          if [ -z "$gradle_file" ]; then
+            echo "Не найден settings.gradle/settings.gradle.kts. Проверьте, что ZIP проекта загружен в репозиторий."
+            exit 1
+          fi
+
+          project_dir="$(dirname "$gradle_file")"
+          echo "Android project: $project_dir"
+
+          if [ ! -f "$project_dir/gradlew" ]; then
+            echo "В проекте нет gradlew (Gradle Wrapper)."
+            exit 1
+          fi
+
+          chmod +x "$project_dir/gradlew"
+          cd "$project_dir"
+          ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SMMWAY-AutoPromo-debug
-          path: project/app/build/outputs/apk/debug/app-debug.apk
+          name: SMMWAY-debug-apk
+          path: '**/build/outputs/apk/debug/*.apk'
           if-no-files-found: error
-          retention-days: 7
