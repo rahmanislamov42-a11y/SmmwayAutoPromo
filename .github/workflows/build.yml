@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,14 +23,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Check Android SDK
+        run: |
+          echo "Android SDK: $ANDROID_HOME"
+          ls "$ANDROID_HOME"
 
-      - name: Unpack project archive (if present)
+      - name: Unpack project archive
         shell: bash
         run: |
-          set -e
-          archive="$(find . -maxdepth 2 -type f -iname '*.zip' ! -path './.git/*' | head -n 1 || true)"
+          archive="$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1 || true)"
           if [ -n "$archive" ]; then
             mkdir -p extracted
             unzip -o "$archive" -d extracted
@@ -36,23 +41,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           gradle_file="$(find . -type f \( -name settings.gradle -o -name settings.gradle.kts \) ! -path './.git/*' | head -n 1)"
 
           if [ -z "$gradle_file" ]; then
-            echo "Не найден settings.gradle/settings.gradle.kts. Проверьте, что ZIP проекта загружен в репозиторий."
+            echo "Не найден файл settings.gradle"
             exit 1
           fi
 
           project_dir="$(dirname "$gradle_file")"
-          echo "Android project: $project_dir"
 
           if [ ! -f "$project_dir/gradlew" ]; then
-            echo "В проекте нет gradlew (Gradle Wrapper)."
+            echo "Не найден Gradle Wrapper"
             exit 1
           fi
 
-          chmod +x "$project_dir/gradlew"
           cd "$project_dir"
+          chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK
