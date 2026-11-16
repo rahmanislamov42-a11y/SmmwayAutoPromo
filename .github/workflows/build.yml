@@ -23,10 +23,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Check Android SDK
-        run: |
-          echo "Android SDK: $ANDROID_HOME"
-          ls "$ANDROID_HOME"
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
       - name: Unpack project archive
         shell: bash
@@ -45,20 +45,15 @@ jobs:
           gradle_file="$(find . -type f \( -name settings.gradle -o -name settings.gradle.kts \) ! -path './.git/*' | head -n 1)"
 
           if [ -z "$gradle_file" ]; then
-            echo "Не найден файл settings.gradle"
+            echo "Не найден settings.gradle"
             exit 1
           fi
 
           project_dir="$(dirname "$gradle_file")"
-
-          if [ ! -f "$project_dir/gradlew" ]; then
-            echo "Не найден Gradle Wrapper"
-            exit 1
-          fi
+          echo "Project directory: $project_dir"
 
           cd "$project_dir"
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
